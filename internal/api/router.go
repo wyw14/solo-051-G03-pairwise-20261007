@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/wyw14/cry-161/internal/service"
 	"net/http"
@@ -17,10 +18,17 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Get("/api/recipes", recipes(svc))
 	r.Get("/api/thickness", thickness(svc))
 	r.Get("/api/incidents", incidents(svc))
+	r.Get("/api/batches", listBatches(svc))
+	r.Post("/api/batches", createBatch(svc))
+	r.Get("/api/batches/{batchID}", getBatch(svc))
+	r.Post("/api/batches/{batchID}/pause", batchAction(svc, svc.Batches.Pause))
+	r.Post("/api/batches/{batchID}/resume", batchAction(svc, svc.Batches.Resume))
+	r.Post("/api/batches/{batchID}/abort", batchAction(svc, svc.Batches.Abort))
 	r.Handle("/runs.html", http.FileServer(http.Dir("web")))
 	r.Handle("/chambers.html", http.FileServer(http.Dir("web")))
 	r.Handle("/layers.html", http.FileServer(http.Dir("web")))
 	r.Handle("/incidents.html", http.FileServer(http.Dir("web")))
+	r.Handle("/batches.html", http.FileServer(http.Dir("web")))
 	r.Get("/api/runtime", runtimeStatus(svc, runtime))
 	r.Get("/api/audit", auditStatus(svc, runtime))
 	r.Post("/api/layers/run", runLayer(svc, runtime))
@@ -32,5 +40,6 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Get("/api/snapshot", restoreSnapshot(svc, book))
 	r.Get("/api/metrics", metricsStatus(svc, runtime))
 	r.Put("/api/recipes/{recipeID}", recipeEdit(svc))
+	go svc.Batches.Run(context.Background(), svc.BatchExecutor(runtime))
 	return r
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/wyw14/cry-161/internal/batch"
 	"github.com/wyw14/cry-161/internal/chamber"
 	"github.com/wyw14/cry-161/internal/journal"
 	"github.com/wyw14/cry-161/internal/model"
@@ -25,6 +26,7 @@ type Service struct {
 	Source   *source.Controller
 	Rotation *rotation.Controller
 	Journal  *journal.Store
+	Batches  *batch.Orchestrator
 }
 
 func New() *Service {
@@ -35,7 +37,12 @@ func New() *Service {
 	if dir == "" {
 		dir = "data"
 	}
-	return &Service{Runs: run.NewRegistry(), Recipes: recipes, Drafts: recipe.NewDraftBook(), Carrier: substrate.NewCarrier(), Chamber: chamber.New("coat-01"), Vacuum: vacuum.NewController(), Source: source.NewController(100), Rotation: rotation.NewController(), Journal: journal.New(dir)}
+	ch := chamber.New("coat-01")
+	carrier := substrate.NewCarrier()
+	sourceCtl := source.NewController(100)
+	journalStore := journal.New(dir)
+	pool := batch.NewLeasePool(ch, carrier, sourceCtl.Admission())
+	return &Service{Runs: run.NewRegistry(), Recipes: recipes, Drafts: recipe.NewDraftBook(), Carrier: carrier, Chamber: ch, Vacuum: vacuum.NewController(), Source: sourceCtl, Rotation: rotation.NewController(), Journal: journalStore, Batches: batch.NewOrchestrator(pool, journalStore, "coat-01")}
 }
 func (s *Service) RecipesList() []*model.Recipe { return s.Recipes.List() }
 func (s *Service) RunsList() []*model.Run       { return s.Runs.List() }
