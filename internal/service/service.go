@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/wyw14/cry-161/internal/batch"
 	"github.com/wyw14/cry-161/internal/chamber"
 	"github.com/wyw14/cry-161/internal/journal"
 	"github.com/wyw14/cry-161/internal/model"
@@ -25,6 +26,9 @@ type Service struct {
 	Source   *source.Controller
 	Rotation *rotation.Controller
 	Journal  *journal.Store
+	Runtime  *Runtime
+	Batches  *batch.Store
+	Exec     *batch.Executor
 }
 
 func New() *Service {
@@ -35,8 +39,15 @@ func New() *Service {
 	if dir == "" {
 		dir = "data"
 	}
-	return &Service{Runs: run.NewRegistry(), Recipes: recipes, Drafts: recipe.NewDraftBook(), Carrier: substrate.NewCarrier(), Chamber: chamber.New("coat-01"), Vacuum: vacuum.NewController(), Source: source.NewController(100), Rotation: rotation.NewController(), Journal: journal.New(dir)}
+	s := &Service{Runs: run.NewRegistry(), Recipes: recipes, Drafts: recipe.NewDraftBook(), Carrier: substrate.NewCarrier(), Chamber: chamber.New("coat-01"), Vacuum: vacuum.NewController(), Source: source.NewController(100), Rotation: rotation.NewController(), Journal: journal.New(dir), Runtime: NewRuntime(), Batches: batch.NewStore()}
+	bridge := newBatchBridge(s, s.Runtime)
+	s.Exec = batch.NewExecutor(s.Batches, bridge, batch.WithObserver(&batchJournalObserver{svc: s}))
+	return s
 }
+
+// StartExecutor binds background batch execution to the process lifetime ctx.
+func (s *Service) StartExecutor(ctx context.Context) { s.Exec.Start(ctx) }
+
 func (s *Service) RecipesList() []*model.Recipe { return s.Recipes.List() }
 func (s *Service) RunsList() []*model.Run       { return s.Runs.List() }
 func (s *Service) Start(ctx context.Context, batch string, recipeID model.ID) (*model.Run, error) {

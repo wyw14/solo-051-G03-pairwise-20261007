@@ -15,6 +15,7 @@ type Chamber struct {
 	sourcePower float64
 	updated     time.Time
 	interlocks  map[string]bool
+	occ         Occupancy
 }
 
 func New(name string) *Chamber {

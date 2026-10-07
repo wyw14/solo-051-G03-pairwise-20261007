@@ -39,6 +39,17 @@ func (r *Registry) Transition(id model.ID, next model.RunState) bool {
 	value.UpdatedAt = time.Now().UTC()
 	return true
 }
+func (r *Registry) SetLayer(id model.ID, number int) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	value, ok := r.runs[id]
+	if !ok {
+		return false
+	}
+	value.Layer = number
+	value.UpdatedAt = time.Now().UTC()
+	return true
+}
 func (r *Registry) UpdateError(id model.ID, err error) {
 	r.mu.Lock()
 	if value, ok := r.runs[id]; ok {

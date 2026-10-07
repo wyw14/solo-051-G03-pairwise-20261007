@@ -111,7 +111,7 @@ func (s *Service) Audit(ctx context.Context, runtime *Runtime) AuditReport {
 		found, ok := carrier.Run("audit")
 		inspection := substrate.Inspect(model.Run{ID: found, Batch: "audit", RecipeID: model.NewID(), State: model.Loading})
 		report.Checks["carrier"] = fmt.Sprintf("loaded=%t run=%t releaseable=%t", carrier.Loaded(), ok, inspection.Releaseable())
-		carrier.Unload("audit")
+		carrier.UnloadBatch("audit")
 	}
 	rotationProfile := rotation.ProfileFor(model.Layer{Number: 1, TargetNanometers: 50, RateNanometers: 2})
 	s.Rotation.Start(model.NewID(), rotationProfile.RPM)
@@ -128,7 +128,7 @@ func (s *Service) Audit(ctx context.Context, runtime *Runtime) AuditReport {
 	report.Checks["shutter"] = fmt.Sprintf("state=%s at=%s", state, changed.Format(time.RFC3339Nano))
 	admission := source.NewAdmission(10)
 	if err := admission.Acquire(ctx, 2); err == nil {
-		admission.Release(2)
+		admission.ReleaseWeight(2)
 	}
 	report.Checks["source_admission"] = fmt.Sprintf("used=%d", admission.Used())
 	starter := run.Starter{Registry: s.Runs, Vacuum: s.Vacuum}

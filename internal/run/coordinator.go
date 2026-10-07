@@ -26,14 +26,17 @@ func (c *Coordinator) Start(ctx context.Context, batch string, recipeID model.ID
 		return nil, err
 	}
 	run := &model.Run{ID: model.NewID(), Batch: batch, RecipeID: recipeID, State: model.Loading, CreatedAt: timeNow(), UpdatedAt: timeNow()}
-	if err := c.Carrier.Load(batch, run.ID); err != nil {
+	carrierToken, err := c.Carrier.LoadFor(batch, run.ID)
+	if err != nil {
 		return nil, err
 	}
 	c.Registry.Add(run)
 	if !c.Registry.Transition(run.ID, model.Pumping) {
+		c.Carrier.Unload(carrierToken)
 		return nil, fmt.Errorf("state transition failed")
 	}
 	if err := c.Vacuum.Start(ctx); err != nil {
+		c.Carrier.Unload(carrierToken)
 		c.Registry.UpdateError(run.ID, err)
 		return nil, err
 	}

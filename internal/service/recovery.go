@@ -87,6 +87,29 @@ func (s *Service) Release(runID model.ID, runtime *Runtime, operator string) (mo
 	return record, nil
 }
 
+// AutoRelease evaluates a batch-driven run that has reached venting using the
+// same gates as an operator release, attributing the decision to the
+// orchestrator. It returns the record and an error when release is rejected.
+func (s *Service) AutoRelease(runID model.ID) (model.ReleaseRecord, error) {
+	value, ok := s.Runs.Get(runID)
+	if !ok {
+		return model.ReleaseRecord{}, fmt.Errorf("run not found")
+	}
+	trace := s.Runtime.Traces.Trace(runID)
+	evidence := make([]model.LayerEvidence, 0, len(trace.Thickness))
+	for index, sample := range trace.Thickness {
+		evidence = append(evidence, model.BuildLayerEvidence(sample, index+1))
+	}
+	record := model.EvaluateRelease(*value, evidence, s.Runtime.Incidents.ForRun(runID), "batch-orchestrator")
+	if err := record.Validate(); err != nil {
+		return record, err
+	}
+	if record.Decision != model.ReleaseApproved {
+		return record, fmt.Errorf("automatic release rejected")
+	}
+	return record, nil
+}
+
 func (s *Service) Schedule(ctx context.Context, runtime *Runtime, runID model.ID, layers []model.Layer) ([]run.ScheduledLayer, error) {
 	scheduler := run.NewScheduler(1)
 	for index, layer := range layers {
